@@ -1,0 +1,3 @@
+import type {Metadata} from "next";import {headers} from "next/headers";import "./globals.css";
+export async function generateMetadata():Promise<Metadata>{const h=await headers(),host=h.get("x-forwarded-host")||h.get("host")||"localhost:3000",protocol=h.get("x-forwarded-proto")||"http",origin=`${protocol}://${host}`;return{title:"Greening | 내 공간에 맞는 반려식물",description:"방 사진 한 장으로 시작하는 반려식물 추천, 관리, 성장 기록 플랫폼",openGraph:{title:"Greening",description:"내 방에 찾아온 작은 초록의 시작",images:[`${origin}/og.png`]},twitter:{card:"summary_large_image",title:"Greening",description:"내 방에 찾아온 작은 초록의 시작",images:[`${origin}/og.png`]}}}
+export default function Layout({children}:{children:React.ReactNode}){return <html lang="ko"><body>{children}</body></html>}
