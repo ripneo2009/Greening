@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
 type Stage =
   | "home"
   | "opening"
@@ -255,6 +257,50 @@ function track(name: string, detail: Record<string, unknown> = {}) {
   localStorage.setItem("greening-analytics", JSON.stringify(e.slice(-100)));
 }
 
+const validStages: Stage[] = [
+  "home",
+  "opening",
+  "questions",
+  "matching",
+  "results",
+  "detail",
+  "commit",
+  "save",
+  "checkout",
+  "complete",
+  "name",
+  "memory",
+  "app",
+  "care",
+];
+
+function routeState(
+  pathname: string,
+): { stage: Stage; qi?: number; slug?: string } | null {
+  if (pathname === "/") return null;
+  if (pathname === "/find/opening") return { stage: "opening" };
+  if (pathname.startsWith("/find/q/")) {
+    const id = pathname.split("/").at(-1);
+    const index = questions.findIndex((question) => question.id === id);
+    return { stage: "questions", qi: index >= 0 ? index : 0 };
+  }
+  if (pathname === "/find/matching") return { stage: "matching" };
+  if (pathname === "/find/results") return { stage: "results" };
+  if (pathname.startsWith("/plants/"))
+    return { stage: "detail", slug: pathname.split("/").at(-1) };
+  const routes: Record<string, Stage> = {
+    "/commit": "commit",
+    "/save-result": "save",
+    "/checkout": "checkout",
+    "/mvp-complete": "complete",
+    "/name": "name",
+    "/memory-preview": "memory",
+    "/app": "app",
+    "/care": "care",
+  };
+  return routes[pathname] ? { stage: routes[pathname] } : { stage: "home" };
+}
+
 export default function Home() {
   const [stage, setStage] = useState<Stage>("home"),
     [qi, setQi] = useState(0),
@@ -265,35 +311,44 @@ export default function Home() {
     [email, setEmail] = useState(""),
     [nickname, setNickname] = useState(""),
     [panel, setPanel] = useState<Panel>(null),
-    [restored, setRestored] = useState(false);
+    [restored, setRestored] = useState(false),
+    [hydrated, setHydrated] = useState(false);
   /* Session restoration intentionally hydrates the interactive journey once. */
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
-      if (window.location.pathname === "/care") {
-        setStage("care");
-        setRestored(false);
-        return;
-      }
       const raw = localStorage.getItem(STORE);
       if (raw) {
         const d = JSON.parse(raw);
-        setStage(d.stage || "home");
-        setQi(d.qi || 0);
+        const storedStage = validStages.includes(d.stage) ? d.stage : "home";
+        setStage(storedStage);
+        setQi(Math.min(questions.length - 1, Math.max(0, Number(d.qi) || 0)));
         setAnswers(d.answers || {});
         setSlug(d.slug || "parlor-palm");
         setTier(d.tier || "Entry");
         setSavedName(d.savedName || "");
         setEmail(d.email || "");
         setNickname(d.nickname || "");
-        setRestored(d.stage && d.stage !== "home");
+        setRestored(storedStage !== "home");
+      }
+      const route = routeState(window.location.pathname);
+      if (route) {
+        setStage(route.stage);
+        if (route.qi !== undefined) setQi(route.qi);
+        if (route.slug && plants.some((plant) => plant.slug === route.slug))
+          setSlug(route.slug);
+        setRestored(false);
       }
     } catch {
       localStorage.removeItem(STORE);
+      setStage("home");
+    } finally {
+      setHydrated(true);
     }
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
   useEffect(() => {
+    if (!hydrated) return;
     localStorage.setItem(
       STORE,
       JSON.stringify({
@@ -324,7 +379,7 @@ export default function Home() {
       care: "/care",
     };
     history.replaceState({}, "", paths[stage]);
-  }, [stage, qi, answers, slug, tier, savedName, email, nickname]);
+  }, [hydrated, stage, qi, answers, slug, tier, savedName, email, nickname]);
   const results = useMemo(
     () =>
       plants
@@ -1227,10 +1282,13 @@ function CareExperience({
   const [scanPreview, setScanPreview] = useState("");
   const [scanDone, setScanDone] = useState(false);
   const [doctorText, setDoctorText] = useState("");
-  const [messages, setMessages] = useState([
+  const [doctorBusy, setDoctorBusy] = useState(false);
+  const [messages, setMessages] = useState<
+    { role: "user" | "assistant"; text: string }[]
+  >([
     {
       role: "assistant",
-      text: `안녕하세요. ${nickname}의 상태에서 궁금한 점을 편하게 알려주세요.`,
+      text: `안녕하세요. ${nickname}(${plant.name})의 상태에서 궁금한 점을 편하게 알려주세요.`,
     },
   ]);
   const [quizStep, setQuizStep] = useState(0);
@@ -1262,20 +1320,42 @@ function CareExperience({
     setDiaryText("");
     setNotice("기록을 저장하고 30P를 적립했어요.");
   }
-  function askDoctor(text: string) {
+  async function askDoctor(text: string) {
     const clean = text.trim();
-    if (!clean) return;
-    const answer = /노랗|축축|과습/.test(clean)
-      ? "흙이 계속 축축하다면 물주기를 잠시 멈추고 통풍을 확인해주세요. 최근 물을 준 날짜도 알려주실래요?"
-      : /벌레|솜|거미줄/.test(clean)
-        ? "다른 식물과 먼저 분리하고 잎 앞뒤를 확인해주세요. 벌레의 색과 크기를 알려주시면 다음 순서를 안내할게요."
-        : `${nickname}의 흙 마름, 빛을 받는 시간, 최근 물 준 날짜를 함께 알려주시면 관리 순서를 더 정확히 살펴볼게요.`;
-    setMessages((v) => [
-      ...v,
-      { role: "user", text: clean },
-      { role: "assistant", text: answer },
-    ]);
+    if (!clean || doctorBusy) return;
+    const next = [...messages, { role: "user" as const, text: clean }];
+    setMessages(next);
     setDoctorText("");
+    setDoctorBusy(true);
+    try {
+      const response = await fetch(`${API}/api/v1/doctor/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: next.slice(-12).map((message) => ({
+            role: message.role,
+            content: message.text,
+          })),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.reply) throw new Error("AI 응답 오류");
+      setMessages((current) => [
+        ...current,
+        { role: "assistant", text: data.reply },
+      ]);
+      track("plant_doctor_replied", { fallback: Boolean(data.fallback) });
+    } catch {
+      setMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          text: "지금은 AI 닥터 연결이 잠시 불안정해요. 잠시 후 다시 시도하거나, 잎과 흙 상태를 사진과 함께 가까운 화원에 보여주세요.",
+        },
+      ]);
+    } finally {
+      setDoctorBusy(false);
+    }
   }
 
   return (
@@ -1609,7 +1689,11 @@ function CareExperience({
                   "흙에 작은 벌레가 보여요",
                   "물을 얼마나 줘야 하나요?",
                 ].map((x) => (
-                  <button key={x} onClick={() => askDoctor(x)}>
+                  <button
+                    key={x}
+                    disabled={doctorBusy}
+                    onClick={() => askDoctor(x)}
+                  >
                     {x}
                     <span>→</span>
                   </button>
@@ -1629,7 +1713,11 @@ function CareExperience({
                   <div className="doctorAvatar">AI</div>
                   <span>
                     <b>닥터 그린</b>
-                    <small>관리 판단을 돕는 가이드</small>
+                    <small>
+                      {doctorBusy
+                        ? "답변을 살펴보는 중"
+                        : "AI 온라인 · 대화 문맥 연결됨"}
+                    </small>
                   </span>
                   <button
                     onClick={() =>
@@ -1651,6 +1739,16 @@ function CareExperience({
                       <p>{m.text}</p>
                     </div>
                   ))}
+                  {doctorBusy && (
+                    <div className="assistant doctorThinking">
+                      <span>AI</span>
+                      <p>
+                        <i />
+                        <i />
+                        <i />
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <form
                   onSubmit={(e) => {
@@ -1663,7 +1761,9 @@ function CareExperience({
                     onChange={(e) => setDoctorText(e.target.value)}
                     placeholder="식물 상태를 자세히 적어주세요"
                   />
-                  <button disabled={!doctorText.trim()}>보내기</button>
+                  <button disabled={!doctorText.trim() || doctorBusy}>
+                    {doctorBusy ? "답변 중" : "보내기"}
+                  </button>
                 </form>
               </section>
             </div>
