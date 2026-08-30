@@ -301,6 +301,21 @@ function routeState(
   return routes[pathname] ? { stage: routes[pathname] } : { stage: "home" };
 }
 
+function smoothly(update: () => void) {
+  if (typeof document === "undefined") return update();
+  const motionOff = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  const viewDocument = document as Document & {
+    startViewTransition?: (callback: () => void) => void;
+  };
+  if (!motionOff && viewDocument.startViewTransition) {
+    viewDocument.startViewTransition(update);
+  } else {
+    update();
+  }
+}
+
 export default function Home() {
   const [stage, setStage] = useState<Stage>("home"),
     [qi, setQi] = useState(0),
@@ -394,9 +409,11 @@ export default function Home() {
     activeTier = selected.tiers.includes(tier) ? tier : selected.tiers[0],
     q = questions[qi];
   function go(s: Stage) {
-    setStage(s);
-    setRestored(false);
-    track("screen_viewed", { stage: s });
+    smoothly(() => {
+      setStage(s);
+      setRestored(false);
+      track("screen_viewed", { stage: s });
+    });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
   function start() {
@@ -409,7 +426,10 @@ export default function Home() {
     setAnswers((a) => ({ ...a, [q.id]: v }));
     track("adoption_step_completed", { question: q.id, value: v });
     setTimeout(
-      () => (qi < questions.length - 1 ? setQi((x) => x + 1) : go("matching")),
+      () =>
+        qi < questions.length - 1
+          ? smoothly(() => setQi((x) => x + 1))
+          : go("matching"),
       180,
     );
   }
@@ -608,7 +628,7 @@ export default function Home() {
           >
             <i style={{ width: `${((qi + 1) / questions.length) * 100}%` }} />
           </div>
-          <div className="questionBody">
+          <div className="questionBody" key={q.id}>
             <p className="stepLabel">{String(qi + 1).padStart(2, "0")} / 07</p>
             <h1>{q.title}</h1>
             <p className="questionHelper">{q.helper}</p>
@@ -1300,8 +1320,10 @@ function CareExperience({
   );
 
   function selectTab(next: CareTab) {
-    setTab(next);
-    setNotice("");
+    smoothly(() => {
+      setTab(next);
+      setNotice("");
+    });
     window.scrollTo({ top: 0, behavior: "smooth" });
     track("care_tab_viewed", { tab: next });
   }
