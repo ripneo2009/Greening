@@ -1,3 +1,38 @@
-import type {Metadata} from "next";import {headers} from "next/headers";import "./globals.css";
-export async function generateMetadata():Promise<Metadata>{const h=await headers(),host=h.get("x-forwarded-host")||h.get("host")||"localhost:3000",protocol=h.get("x-forwarded-proto")||"http",origin=`${protocol}://${host}`;return{title:"Greening | 내 공간에 맞는 반려식물",description:"방 사진 한 장으로 시작하는 반려식물 추천, 관리, 성장 기록 플랫폼",openGraph:{title:"Greening",description:"내 방에 찾아온 작은 초록의 시작",images:[`${origin}/og.png`]},twitter:{card:"summary_large_image",title:"Greening",description:"내 방에 찾아온 작은 초록의 시작",images:[`${origin}/og.png`]}}}
-export default function Layout({children}:{children:React.ReactNode}){return <html lang="ko"><body>{children}</body></html>}
+import type { Metadata } from "next";
+import { headers } from "next/headers";
+import "./globals.css";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const requestHeaders = await headers();
+  const host =
+    requestHeaders.get("x-forwarded-host") ||
+    requestHeaders.get("host") ||
+    "localhost:3000";
+  const protocol = requestHeaders.get("x-forwarded-proto") || "http";
+  const origin = `${protocol}://${host}`;
+  return {
+    title: "Greening | 오래 함께할 반려식물 찾기",
+    description:
+      "공간과 생활 리듬에 맞는 반려식물을 추천받고 함께할 준비를 시작해보세요.",
+    robots: { index: false, follow: false },
+    openGraph: {
+      title: "Greening | 오래 함께할 초록을 찾다",
+      description: "생존 가능성부터 살펴보는 나만의 반려식물 추천 경험",
+      images: [`${origin}/og.png`],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Greening | 오래 함께할 초록을 찾다",
+      description: "생존 가능성부터 살펴보는 나만의 반려식물 추천 경험",
+      images: [`${origin}/og.png`],
+    },
+  };
+}
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="ko">
+      <body>{children}</body>
+    </html>
+  );
+}
