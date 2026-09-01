@@ -666,7 +666,7 @@ export default function Home() {
             <br />
             오래 함께할 후보를 찾고 있어요.
           </h1>
-          <p>빛, 생활 패턴, 안전 조건을 차례로 살펴보는 중이에요.</p>
+          <p>위치와 지역 특성을 반영해 어울리는 식물을 찾는 중이에요...</p>
         </section>
       )}
 
@@ -1125,7 +1125,7 @@ export default function Home() {
               차분히 전해드릴게요.
             </p>
             <button className="primary" onClick={() => go("care")}>
-              Care 앱 체험하기 <span>→</span>
+              Greening 앱 시작하기 <span>→</span>
             </button>
           </div>
         </section>
