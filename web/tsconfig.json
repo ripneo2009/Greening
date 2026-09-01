@@ -41,6 +41,7 @@
     "db",
     "examples",
     "worker",
+    "build",
     "dist",
     "vite.config.ts",
     "drizzle.config.ts"
